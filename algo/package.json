@@ -1,0 +1,57 @@
+{
+  "homepage": "http://zmaqutu.github.io/3D-Pathfinding-Visualizer",
+  "name": "3d-pathfinding-project",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@material-ui/core": "^4.11.4",
+    "@material-ui/icons": "^4.11.2",
+    "@tensorflow/tfjs": "^3.7.0",
+    "@testing-library/jest-dom": "^5.11.5",
+    "@testing-library/react": "^11.1.0",
+    "@testing-library/user-event": "^12.1.10",
+    "@tweenjs/tween.js": "^18.6.4",
+    "drei": "^1.5.7",
+    "random-weighted-choice": "^0.1.4",
+    "react": "^17.0.1",
+    "react-awesome-button": "^6.5.1",
+    "react-dom": "^17.0.1",
+    "react-scripts": "4.0.0",
+    "react-select": "^3.1.0",
+    "react-spring": "^8.0.27",
+    "react-three-fiber": "^5.1.4",
+    "react-tween-state": "^0.1.5",
+    "sass": "^1.35.1",
+    "three": "^0.122.0",
+    "web-vitals": "^0.2.4"
+  },
+  "scripts": {
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d build",
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "gh-pages": "^3.1.0"
+  }
+}
