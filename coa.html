@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>3D CPU Visualization</title>
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/loaders/GLTFLoader.js"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            z-index: 100;
+            pointer-events: none;
+        }
+        #ui {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+            color: white;
+            z-index: 100;
+        }
+        button {
+            background: #4CAF50;
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .highlight {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="info">Interactive 3D CPU Visualization</div>
+    <div id="ui">
+        <button id="executeBtn">Execute Instruction</button>
+        <button id="resetBtn">Reset CPU</button>
+        <div id="status">Status: Ready</div>
+    </div>
+
+    <!-- A-Frame Scene -->
+    <a-scene embedded>
+        <a-assets>
+            <!-- Updated path to your local GLB model -->
+       <a-asset-item id="cpu-model" src="C://Users//Afraa//Documents//ar//model//components.glb"></a-asset-item>
+        </a-assets>
+
+        <!-- CPU Model -->
+        <a-entity gltf-model="#cpu-model" position="0 0 -5" scale="0.5 0.5 0.5" 
+                 class="clickable" id="cpu" register-highlight>
+            <!-- Reference points for interaction (adjust positions as needed) -->
+            <a-entity class="register" data-name="AX" position="-1 0.5 0"></a-entity>
+            <a-entity class="register" data-name="BX" position="-0.5 0.5 0"></a-entity>
+            <a-entity class="alu" position="0.5 0.5 0"></a-entity>
+            <a-entity class="bus" position="0 0.2 0" scale="2 0.1 0.1"></a-entity>
+        </a-entity>
+
+        <!-- Camera -->
+        <a-camera position="0 1.6 0" wasd-controls="enabled: true">
+            <a-cursor></a-cursor>
+        </a-camera>
+
+        <!-- Lighting -->
+        <a-light type="ambient" color="#445451"></a-light>
+        <a-light type="directional" color="#fff" intensity="0.5" position="-1 1 0"></a-light>
+    </a-scene>
+
+    <script>
+        // Three.js Visualization
+        const threeContainer = document.createElement('div');
+        threeContainer.style.position = 'absolute';
+        threeContainer.style.top = '0';
+        threeContainer.style.width = '100%';
+        threeContainer.style.height = '100%';
+        threeContainer.style.pointerEvents = 'none';
+        document.body.appendChild(threeContainer);
+
+        // Three.js Scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        threeContainer.appendChild(renderer.domElement);
+
+        // Instruction visualization
+        const instructionGeometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+        const instructionMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+        const instructionCube = new THREE.Mesh(instructionGeometry, instructionMaterial);
+        scene.add(instructionCube);
+        instructionCube.visible = false;
+
+        // Animation variables
+        let isExecuting = false;
+        let currentStep = 0;
+        const executionSteps = [
+            { pos: [-1, 0.5, -2], target: 'AX', color: 0xff0000 },
+            { pos: [0.5, 0.5, -2], target: 'ALU', color: 0x00ff00 },
+            { pos: [-0.5, 0.5, -2], target: 'BX', color: 0x0000ff },
+            { pos: [0, 0.2, -2], target: 'BUS', color: 0xffff00 }
+        ];
+
+        // Execute instruction
+        document.getElementById('executeBtn').addEventListener('click', () => {
+            if (!isExecuting) {
+                isExecuting = true;
+                currentStep = 0;
+                document.getElementById('status').textContent = 'Status: Executing...';
+                executeStep();
+            }
+        });
+
+        // Reset CPU
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            isExecuting = false;
+            instructionCube.visible = false;
+            document.getElementById('status').textContent = 'Status: Reset';
+            
+            // Reset highlights in A-Frame
+            const highlights = document.querySelectorAll('.highlight');
+            highlights.forEach(el => el.classList.remove('highlight'));
+        });
+
+        function executeStep() {
+            if (!isExecuting || currentStep >= executionSteps.length) {
+                isExecuting = false;
+                instructionCube.visible = false;
+                document.getElementById('status').textContent = 'Status: Execution Complete';
+                return;
+            }
+
+            const step = executionSteps[currentStep];
+            instructionCube.material.color.setHex(step.color);
+            instructionCube.position.set(...step.pos);
+            instructionCube.visible = true;
+
+            // Highlight component in A-Frame
+            const aframeTarget = document.querySelector(`.${step.target.toLowerCase()}`);
+            if (aframeTarget) {
+                aframeTarget.classList.add('highlight');
+            }
+
+            // Animate movement
+            const targetPos = new THREE.Vector3(...step.pos);
+            targetPos.z += 1;
+            
+            const duration = 1000;
+            const startTime = Date.now();
+            
+            function animateInstruction() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                instructionCube.position.lerpVectors(
+                    new THREE.Vector3(...step.pos),
+                    targetPos,
+                    progress
+                );
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animateInstruction);
+                } else {
+                    if (aframeTarget) {
+                        aframeTarget.classList.remove('highlight');
+                    }
+                    currentStep++;
+                    setTimeout(executeStep, 500);
+                }
+            }
+            
+            animateInstruction();
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // A-Frame interactions
+        AFRAME.registerComponent('register-highlight', {
+            init: function() {
+                this.el.addEventListener('model-loaded', () => {
+                    // Auto-rotate for better viewing (optional)
+                    this.el.setAttribute('animation', {
+                        property: 'rotation',
+                        to: '0 360 0',
+                        dur: 20000,
+                        loop: true
+                    });
+                });
+
+                this.el.addEventListener('click', (e) => {
+                    const clickedElement = e.target;
+                    if (clickedElement.classList.contains('register') || 
+                        clickedElement.classList.contains('alu') || 
+                        clickedElement.classList.contains('bus')) {
+                        
+                        const name = clickedElement.getAttribute('data-name') || 
+                                    clickedElement.classList.contains('alu') ? 'ALU' : 'Memory Bus';
+                        document.getElementById('status').textContent = `Clicked: ${name}`;
+                        
+                        // Visual feedback
+                        clickedElement.setAttribute('animation', {
+                            property: 'scale',
+                            to: '1.2 1.2 1.2',
+                            dur: 300,
+                            easing: 'easeInOutQuad',
+                            dir: 'alternate'
+                        });
+                    }
+                });
+            }
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Local file loading warning
+        if (window.location.protocol === 'file:') {
+            alert("For local GLB loading, use a local server like:\n\n1. VS Code Live Server extension\n2. python -m http.server\n3. npm live-server");
+        }
+    </script>
+</body>
+</html>

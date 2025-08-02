@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D OS Simulation</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', sans-serif;
+            background-color: #000;
+            color: #fff;
+        }
+        canvas {
+            display: block;
+        }
+        #ui {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 30, 0.7);
+            border: 1px solid #00ffff;
+            border-radius: 8px;
+            padding: 15px;
+            width: 300px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3);
+        }
+        .tab {
+            padding: 8px 15px;
+            margin-right: 5px;
+            background: rgba(0, 50, 100, 0.5);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .tab:hover {
+            background: rgba(0, 150, 255, 0.3);
+        }
+        .tab.active {
+            background: rgba(0, 100, 255, 0.7);
+            border-left: 3px solid #00ffff;
+        }
+        .panel {
+            display: none;
+            margin-top: 15px;
+        }
+        .panel.active {
+            display: block;
+        }
+        .process {
+            height: 20px;
+            margin: 5px 0;
+            background: linear-gradient(90deg, #00ffff, #0088ff);
+            border-radius: 3px;
+            transition: width 0.5s;
+        }
+        .memory-block {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            margin: 2px;
+            background: rgba(0, 255, 255, 0.2);
+            border: 1px solid #00ffff;
+            transition: all 0.3s;
+        }
+        .memory-block.used {
+            background: rgba(0, 255, 255, 0.7);
+        }
+        .file {
+            padding: 5px;
+            margin: 5px;
+            background: rgba(0, 100, 255, 0.3);
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        #loading {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading 3D OS Simulation...</div>
+    
+    <div id="ui">
+        <div>
+            <button class="tab active" data-tab="scheduler">Scheduler</button>
+            <button class="tab" data-tab="memory">Memory</button>
+            <button class="tab" data-tab="filesystem">Filesystem</button>
+        </div>
+        
+        <div id="scheduler-panel" class="panel active">
+            <h3>Process Scheduling</h3>
+            <select id="algorithm">
+                <option value="fcfs">FCFS</option>
+                <option value="sjf">SJF</option>
+                <option value="rr">Round Robin</option>
+                <option value="priority">Priority</option>
+            </select>
+            <button id="add-process">Add Process</button>
+            <div id="process-queue"></div>
+        </div>
+        
+        <div id="memory-panel" class="panel">
+            <h3>Memory Management</h3>
+            <div id="memory-blocks"></div>
+            <button id="allocate-mem">Allocate Memory</button>
+            <button id="free-mem">Free Memory</button>
+        </div>
+        
+        <div id="filesystem-panel" class="panel">
+            <h3>File System</h3>
+            <div id="file-explorer"></div>
+            <button id="create-file">Create File</button>
+            <button id="delete-file">Delete File</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // Main 3D Scene
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(0x000000);
+        document.body.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        camera.position.set(0, 5, 10);
+        controls.update();
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+        
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        // OS Visualization Objects
+        const osObjects = {
+            scheduler: createSchedulerScene(),
+            memory: createMemoryScene(),
+            filesystem: createFilesystemScene()
+        };
+
+        // Add all to scene but hide initially
+        Object.values(osObjects).forEach(obj => {
+            obj.visible = false;
+            scene.add(obj);
+        });
+        osObjects.scheduler.visible = true;
+
+        // UI Interactions
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(`${tab.dataset.tab}-panel`).classList.add('active');
+                
+                Object.values(osObjects).forEach(obj => obj.visible = false);
+                osObjects[tab.dataset.tab].visible = true;
+            });
+        });
+
+        // Process Scheduling Simulation
+        const processes = [];
+        document.getElementById('add-process').addEventListener('click', () => {
+            const duration = Math.floor(Math.random() * 5) + 1;
+            const priority = Math.floor(Math.random() * 5) + 1;
+            addProcess(duration, priority);
+        });
+
+        function addProcess(duration, priority) {
+            const process = {
+                id: processes.length + 1,
+                duration,
+                priority,
+                progress: 0
+            };
+            processes.push(process);
+            updateProcessVisualization();
+        }
+
+        function updateProcessVisualization() {
+            const queueDiv = document.getElementById('process-queue');
+            queueDiv.innerHTML = '';
+            
+            processes.forEach(proc => {
+                const div = document.createElement('div');
+                div.className = 'process';
+                div.style.width = `${(proc.progress / proc.duration) * 100}%`;
+                div.textContent = `PID: ${proc.id} (${proc.duration}s)`;
+                queueDiv.appendChild(div);
+            });
+            
+            // Update 3D visualization
+            updateScheduler3D();
+        }
+
+        function updateScheduler3D() {
+            // Clear old processes
+            osObjects.scheduler.children.forEach(child => {
+                if (child.userData.isProcess) {
+                    osObjects.scheduler.remove(child);
+                }
+            });
+            
+            // Add new processes
+            processes.forEach((proc, i) => {
+                const geometry = new THREE.BoxGeometry(0.5, 0.2, 0.5);
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: new THREE.Color().setHSL(i / processes.length, 1, 0.5),
+                    emissive: 0x00ffff,
+                    emissiveIntensity: 0.2
+                });
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.x = i * 0.6 - (processes.length * 0.3);
+                cube.position.y = 0.1;
+                cube.userData.isProcess = true;
+                osObjects.scheduler.add(cube);
+            });
+        }
+
+        // Memory Management Simulation
+        const memoryBlocks = Array(64).fill(false);
+        renderMemoryBlocks();
+
+        document.getElementById('allocate-mem').addEventListener('click', () => {
+            const size = Math.floor(Math.random() * 8) + 1;
+            allocateMemory(size);
+        });
+
+        document.getElementById('free-mem').addEventListener('click', () => {
+            freeRandomMemory();
+        });
+
+        function allocateMemory(size) {
+            let startIndex = -1;
+            for (let i = 0; i < memoryBlocks.length; i++) {
+                if (!memoryBlocks[i]) {
+                    let j = i;
+                    while (j < memoryBlocks.length && !memoryBlocks[j] && (j - i + 1) <= size) {
+                        j++;
+                    }
+                    if ((j - i) >= size) {
+                        startIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            if (startIndex !== -1) {
+                for (let i = startIndex; i < startIndex + size; i++) {
+                    memoryBlocks[i] = true;
+                }
+                renderMemoryBlocks();
+                updateMemory3D();
+            }
+        }
+
+        function freeRandomMemory() {
+            const usedBlocks = memoryBlocks.map((used, index) => used ? index : -1).filter(i => i !== -1);
+            if (usedBlocks.length > 0) {
+                const toFree = usedBlocks[Math.floor(Math.random() * usedBlocks.length)];
+                memoryBlocks[toFree] = false;
+                renderMemoryBlocks();
+                updateMemory3D();
+            }
+        }
+
+        function renderMemoryBlocks() {
+            const container = document.getElementById('memory-blocks');
+            container.innerHTML = '';
+            
+            for (let i = 0; i < memoryBlocks.length; i++) {
+                const block = document.createElement('div');
+                block.className = `memory-block ${memoryBlocks[i] ? 'used' : ''}`;
+                block.title = `Block ${i}: ${memoryBlocks[i] ? 'Used' : 'Free'}`;
+                container.appendChild(block);
+            }
+        }
+
+        function updateMemory3D() {
+            // Clear old blocks
+            osObjects.memory.children.forEach(child => {
+                if (child.userData.isMemoryBlock) {
+                    osObjects.memory.remove(child);
+                }
+            });
+            
+            // Add new blocks
+            const gridSize = 8;
+            for (let i = 0; i < memoryBlocks.length; i++) {
+                const row = Math.floor(i / gridSize);
+                const col = i % gridSize;
+                
+                const geometry = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+                const material = new THREE.MeshPhongMaterial({ 
+                    color: memoryBlocks[i] ? 0x00aaff : 0x333333,
+                    emissive: memoryBlocks[i] ? 0x00ffff : 0x000000,
+                    emissiveIntensity: 0.1
+                });
+                
+                const cube = new THREE.Mesh(geometry, material);
+                cube.position.x = col * 0.6 - (gridSize * 0.3);
+                cube.position.z = row * 0.6 - (gridSize * 0.3);
+                cube.userData.isMemoryBlock = true;
+                osObjects.memory.add(cube);
+            }
+        }
+
+        // File System Simulation
+        const fileSystem = {
+            name: "root",
+            type: "directory",
+            children: [
+                { name: "Documents", type: "directory", children: [] },
+                { name: "System", type: "directory", children: [] },
+                { name: "Users", type: "directory", children: [] }
+            ]
+        };
+
+        renderFileSystem();
+
+        document.getElementById('create-file').addEventListener('click', () => {
+            const fileName = `file_${Math.floor(Math.random() * 100)}.txt`;
+            const fileSize = Math.floor(Math.random() * 100) + 1;
+            addFile(fileName, fileSize);
+        });
+
+        document.getElementById('delete-file').addEventListener('click', () => {
+            deleteRandomFile();
+        });
+
+        function addFile(name, size) {
+            // Add to random directory
+            const dirs = getAllDirectories(fileSystem);
+            if (dirs.length > 0) {
+                const targetDir = dirs[Math.floor(Math.random() * dirs.length)];
+                targetDir.children.push({
+                    name,
+                    type: "file",
+                    size
+                });
+                renderFileSystem();
+                updateFilesystem3D();
+            }
+        }
+
+        function deleteRandomFile() {
+            const files = getAllFiles(fileSystem);
+            if (files.length > 0) {
+                const fileToDelete = files[Math.floor(Math.random() * files.length)];
+                const parent = findParent(fileSystem, fileToDelete.name);
+                if (parent) {
+                    parent.children = parent.children.filter(child => child !== fileToDelete);
+                    renderFileSystem();
+                    updateFilesystem3D();
+                }
+            }
+        }
+
+        function getAllDirectories(node) {
+            let dirs = [];
+            if (node.type === "directory") {
+                dirs.push(node);
+                node.children.forEach(child => {
+                    dirs = dirs.concat(getAllDirectories(child));
+                });
+            }
+            return dirs;
+        }
+
+        function getAllFiles(node) {
+            let files = [];
+            if (node.type === "file") {
+                files.push(node);
+            } else if (node.type === "directory") {
+                node.children.forEach(child => {
+                    files = files.concat(getAllFiles(child));
+                });
+            }
+            return files;
+        }
+
+        function findParent(root, name) {
+            if (!root.children) return null;
+            
+            for (const child of root.children) {
+                if (child.name === name) return root;
+                const found = findParent(child, name);
+                if (found) return found;
+            }
+            return null;
+        }
+
+        function renderFileSystem() {
+            const container = document.getElementById('file-explorer');
+            container.innerHTML = '';
+            renderDirectory(fileSystem, container);
+        }
+
+        function renderDirectory(dir, parentElement, depth = 0) {
+            const div = document.createElement('div');
+            div.style.marginLeft = `${depth * 15}px`;
+            div.textContent = `📁 ${dir.name}`;
+            parentElement.appendChild(div);
+            
+            dir.children.forEach(child => {
+                if (child.type === "directory") {
+                    renderDirectory(child, parentElement, depth + 1);
+                } else {
+                    const fileDiv = document.createElement('div');
+                    fileDiv.className = 'file';
+                    fileDiv.style.marginLeft = `${(depth + 1) * 15}px`;
+                    fileDiv.textContent = `📄 ${child.name} (${child.size}KB)`;
+                    parentElement.appendChild(fileDiv);
+                }
+            });
+        }
+
+        function updateFilesystem3D() {
+            // Clear old filesystem
+            osObjects.filesystem.children.forEach(child => {
+                if (child.userData.isFSNode) {
+                    osObjects.filesystem.remove(child);
+                }
+            });
+            
+            // Add new filesystem visualization
+            renderDirectory3D(fileSystem, osObjects.filesystem, 0, 0, 0);
+        }
+
+        function renderDirectory3D(node, parentObj, x, y, z, depth = 0) {
+            const color = node.type === "directory" ? 0x00aaff : 0x00ff88;
+            const size = node.type === "directory" ? 0.4 : 0.2;
+            
+            const geometry = new THREE.SphereGeometry(size, 16, 16);
+            const material = new THREE.MeshPhongMaterial({ 
+                color,
+                emissive: color,
+                emissiveIntensity: 0.2
+            });
+            
+            const sphere = new THREE.Mesh(geometry, material);
+            sphere.position.set(x, y, z);
+            sphere.userData = { isFSNode: true, name: node.name };
+            parentObj.add(sphere);
+            
+            if (node.children) {
+                const angleStep = (Math.PI * 2) / node.children.length;
+                node.children.forEach((child, i) => {
+                    const angle = angleStep * i;
+                    const childX = x + Math.cos(angle) * 2;
+                    const childZ = z + Math.sin(angle) * 2;
+                    const childY = y - 0.5;
+                    
+                    // Add connecting line
+                    const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+                        new THREE.Vector3(x, y, z),
+                        new THREE.Vector3(childX, childY, childZ)
+                    ]);
+                    const lineMaterial = new THREE.LineBasicMaterial({ 
+                        color: 0x00ffff,
+                        transparent: true,
+                        opacity: 0.5
+                    });
+                    const line = new THREE.Line(lineGeometry, lineMaterial);
+                    line.userData = { isFSNode: true };
+                    parentObj.add(line);
+                    
+                    renderDirectory3D(child, parentObj, childX, childY, childZ, depth + 1);
+                });
+            }
+        }
+
+        // Create 3D scenes
+        function createSchedulerScene() {
+            const group = new THREE.Group();
+            
+            // Create CPU visualization
+            const cpuGeometry = new THREE.CylinderGeometry(2, 2, 0.5, 32);
+            const cpuMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x333333,
+                emissive: 0x00ffff,
+                emissiveIntensity: 0.1
+            });
+            const cpu = new THREE.Mesh(cpuGeometry, cpuMaterial);
+            cpu.rotation.x = Math.PI / 2;
+            group.add(cpu);
+            
+            // Create queue line
+            const curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(-3, 0.5, 0),
+                new THREE.Vector3(0, 0.5, 1),
+                new THREE.Vector3(3, 0.5, 0)
+            ]);
+            const points = curve.getPoints(50);
+            const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+            const lineMaterial = new THREE.LineBasicMaterial({ color: 0x00ffff });
+            const line = new THREE.Line(lineGeometry, lineMaterial);
+            group.add(line);
+            
+            return group;
+        }
+
+        function createMemoryScene() {
+            const group = new THREE.Group();
+            
+            // Create RAM board
+            const ramGeometry = new THREE.BoxGeometry(6, 0.2, 6);
+            const ramMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x111122,
+                emissive: 0x000033,
+                emissiveIntensity: 0.1
+            });
+            const ram = new THREE.Mesh(ramGeometry, ramMaterial);
+            group.add(ram);
+            
+            return group;
+        }
+
+        function createFilesystemScene() {
+            const group = new THREE.Group();
+            
+            // Create storage device
+            const storageGeometry = new THREE.TorusGeometry(2, 0.5, 16, 32);
+            const storageMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x333355,
+                emissive: 0x000044,
+                emissiveIntensity: 0.1
+            });
+            const storage = new THREE.Mesh(storageGeometry, storageMaterial);
+            storage.rotation.x = Math.PI / 2;
+            group.add(storage);
+            
+            return group;
+        }
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Rotate OS components
+            osObjects.scheduler.rotation.y += 0.005;
+            osObjects.memory.rotation.y += 0.003;
+            osObjects.filesystem.rotation.y += 0.007;
+            
+            // Update process progress
+            if (processes.length > 0 && osObjects.scheduler.visible) {
+                processes[0].progress += 0.01;
+                if (processes[0].progress >= processes[0].duration) {
+                    processes.shift();
+                }
+                updateProcessVisualization();
+            }
+            
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Initialize memory blocks visualization
+        for (let i = 0; i < 8; i++) {
+            allocateMemory(Math.floor(Math.random() * 3) + 1);
+        }
+
+        // Initialize file system with some files
+        for (let i = 0; i < 5; i++) {
+            addFile(`system_${i}.dll`, Math.floor(Math.random() * 50) + 10);
+        }
+
+        // Start animation
+        document.getElementById('loading').style.display = 'none';
+        animate();
+    </script>
+</body>
+</html>

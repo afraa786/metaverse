@@ -1,0 +1,747 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Database Visualization</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #000;
+            font-family: 'Courier New', monospace;
+        }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: #0ff;
+            font-size: 14px;
+            text-shadow: 0 0 5px #0ff;
+            pointer-events: none;
+        }
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #0ff;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #0ff;
+        }
+        button {
+            background: #005;
+            color: #0ff;
+            border: 1px solid #0ff;
+            padding: 5px 10px;
+            margin: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #007;
+            box-shadow: 0 0 10px #0ff;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">3D Database Visualization<br>Click tables to inspect | Hover over joins</div>
+    <div id="controls">
+        <button id="runQuery">Run JOIN Query</button>
+        <button id="insertData">Insert Row</button>
+        <button id="updateData">Update Row</button>
+        <button id="deleteData">Delete Row</button>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.132.2/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // Scene setup
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x020817);
+        scene.fog = new THREE.FogExp2(0x020817, 0.001);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 5, 15);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x222233);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0x4466ff, 0.5);
+        directionalLight.position.set(1, 1, 1);
+        scene.add(directionalLight);
+
+        const neonLight1 = new THREE.PointLight(0x00ffff, 1, 20);
+        neonLight1.position.set(5, 3, 5);
+        scene.add(neonLight1);
+
+        const neonLight2 = new THREE.PointLight(0xff00ff, 1, 20);
+        neonLight2.position.set(-5, 3, -5);
+        scene.add(neonLight2);
+
+        // Grid floor
+        const gridHelper = new THREE.GridHelper(30, 30, 0x00ffff, 0x003333);
+        gridHelper.position.y = -0.5;
+        scene.add(gridHelper);
+
+        // Database tables data
+        const database = {
+            users: {
+                columns: ['id', 'name', 'email', 'status'],
+                data: [
+                    [1, 'Alice', 'alice@example.com', 'active'],
+                    [2, 'Bob', 'bob@example.com', 'inactive'],
+                    [3, 'Charlie', 'charlie@example.com', 'active']
+                ],
+                position: { x: -5, y: 2, z: 0 },
+                color: 0x00ffff
+            },
+            orders: {
+                columns: ['order_id', 'user_id', 'product', 'amount'],
+                data: [
+                    [101, 1, 'Laptop', 1200],
+                    [102, 1, 'Mouse', 25],
+                    [103, 2, 'Keyboard', 80]
+                ],
+                position: { x: 5, y: 2, z: 0 },
+                color: 0xff00ff
+            },
+            products: {
+                columns: ['product_id', 'name', 'price', 'stock'],
+                data: [
+                    [1, 'Laptop', 1200, 10],
+                    [2, 'Mouse', 25, 50],
+                    [3, 'Keyboard', 80, 30]
+                ],
+                position: { x: 0, y: 2, z: -5 },
+                color: 0xffff00
+            }
+        };
+
+        // Create database tables
+        const tables = {};
+        const tableMeshes = [];
+        const tableHighlights = [];
+
+        function createTable(name, tableData) {
+            const columns = tableData.columns;
+            const rows = tableData.data;
+            const color = tableData.color;
+            
+            // Table base (glass panel)
+            const geometry = new THREE.PlaneGeometry(4, 3);
+            const material = new THREE.MeshPhongMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.2,
+                specular: 0x555555,
+                shininess: 100
+            });
+            const table = new THREE.Mesh(geometry, material);
+            table.position.set(tableData.position.x, tableData.position.y, tableData.position.z);
+            table.rotation.x = -Math.PI / 8;
+            table.userData = { name, type: 'table' };
+            scene.add(table);
+            tableMeshes.push(table);
+            
+            // Table border (neon effect)
+            const edges = new THREE.EdgesGeometry(geometry);
+            const border = new THREE.LineSegments(
+                edges,
+                new THREE.LineBasicMaterial({ color: color, linewidth: 2 })
+            );
+            border.position.set(tableData.position.x, tableData.position.y, tableData.position.z);
+            border.rotation.x = -Math.PI / 8;
+            scene.add(border);
+            
+            // Table highlight (for selection)
+            const highlight = new THREE.Mesh(
+                geometry,
+                new THREE.MeshBasicMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0,
+                    side: THREE.DoubleSide
+                })
+            );
+            highlight.position.set(tableData.position.x, tableData.position.y, tableData.position.z);
+            highlight.rotation.x = -Math.PI / 8;
+            highlight.scale.set(1.05, 1.05, 1.05);
+            highlight.userData = { name, type: 'table-highlight' };
+            scene.add(highlight);
+            tableHighlights.push(highlight);
+            
+            // Create text for table name
+            createText(name, tableData.position.x, tableData.position.y + 1.8, tableData.position.z, 0.3, color);
+            
+            // Create grid lines
+            const gridGroup = new THREE.Group();
+            
+            // Vertical lines (columns)
+            const colCount = columns.length;
+            for (let i = 0; i <= colCount; i++) {
+                const xPos = -2 + (4 / colCount) * i;
+                const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(xPos, -1.5, 0),
+                    new THREE.Vector3(xPos, 1.5, 0)
+                ]);
+                const line = new THREE.Line(
+                    lineGeometry,
+                    new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.5 })
+                );
+                gridGroup.add(line);
+            }
+            
+            // Horizontal lines (rows)
+            const rowCount = Math.min(5, rows.length + 1); // Header + data rows
+            for (let i = 0; i <= rowCount; i++) {
+                const yPos = 1.5 - (3 / rowCount) * i;
+                const lineGeometry = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(-2, yPos, 0),
+                    new THREE.Vector3(2, yPos, 0)
+                ]);
+                const line = new THREE.Line(
+                    lineGeometry,
+                    new THREE.LineBasicMaterial({ color: color, transparent: true, opacity: 0.5 })
+                );
+                gridGroup.add(line);
+            }
+            
+            gridGroup.position.set(tableData.position.x, tableData.position.y, tableData.position.z);
+            gridGroup.rotation.x = -Math.PI / 8;
+            scene.add(gridGroup);
+            
+            // Create column headers
+            for (let i = 0; i < columns.length; i++) {
+                const xPos = -2 + (4 / colCount) * i + (2 / colCount);
+                createText(columns[i], tableData.position.x + xPos - 2, 
+                          tableData.position.y + 1.5 - (3 / rowCount) * 0.5, 
+                          tableData.position.z, 0.15, 0xffffff);
+            }
+            
+            // Create sample data (limited to fit on table)
+            const displayRows = Math.min(4, rows.length);
+            for (let r = 0; r < displayRows; r++) {
+                for (let c = 0; c < Math.min(columns.length, 4); c++) {
+                    const xPos = -2 + (4 / colCount) * c + (2 / colCount);
+                    const text = String(rows[r][c]).substring(0, 8);
+                    createText(text, tableData.position.x + xPos - 2, 
+                               tableData.position.y + 1.5 - (3 / rowCount) * (r + 1.5), 
+                               tableData.position.z, 0.1, 0xffffff);
+                }
+            }
+            
+            tables[name] = {
+                mesh: table,
+                highlight: highlight,
+                data: tableData
+            };
+        }
+
+        // Helper function to create 3D text
+        function createText(text, x, y, z, size, color) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            canvas.width = 256;
+            canvas.height = 128;
+            
+            context.font = `Bold ${size * 100}px Courier New`;
+            context.fillStyle = `rgba(${color >> 16}, ${(color >> 8) & 0xff}, ${color & 0xff}, 0.8)`;
+            context.textAlign = 'center';
+            context.textBaseline = 'middle';
+            context.fillText(text, canvas.width / 2, canvas.height / 2);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+            const sprite = new THREE.Sprite(material);
+            sprite.position.set(x, y, z);
+            sprite.scale.set(size * 4, size * 2, 1);
+            scene.add(sprite);
+        }
+
+        // Create all tables
+        for (const [name, tableData] of Object.entries(database)) {
+            createTable(name, tableData);
+        }
+
+        // Create foreign key relationships (joins)
+        const joins = [
+            { from: 'users', to: 'orders', fromKey: 'id', toKey: 'user_id', color: 0x00ff00 },
+            { from: 'orders', to: 'products', fromKey: 'product', toKey: 'name', color: 0xff8800 }
+        ];
+
+        const joinLines = [];
+
+        function createJoin(join) {
+            const fromTable = tables[join.from];
+            const toTable = tables[join.to];
+            
+            const curve = new THREE.CubicBezierCurve3(
+                new THREE.Vector3(
+                    fromTable.mesh.position.x,
+                    fromTable.mesh.position.y + 0.5,
+                    fromTable.mesh.position.z
+                ),
+                new THREE.Vector3(
+                    (fromTable.mesh.position.x + toTable.mesh.position.x) / 2,
+                    fromTable.mesh.position.y + 2,
+                    (fromTable.mesh.position.z + toTable.mesh.position.z) / 2
+                ),
+                new THREE.Vector3(
+                    (fromTable.mesh.position.x + toTable.mesh.position.x) / 2,
+                    toTable.mesh.position.y + 2,
+                    (fromTable.mesh.position.z + toTable.mesh.position.z) / 2
+                ),
+                new THREE.Vector3(
+                    toTable.mesh.position.x,
+                    toTable.mesh.position.y + 0.5,
+                    toTable.mesh.position.z
+                )
+            );
+            
+            const points = curve.getPoints(50);
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            
+            const material = new THREE.LineBasicMaterial({
+                color: join.color,
+                transparent: true,
+                opacity: 0.7,
+                linewidth: 2
+            });
+            
+            const line = new THREE.Line(geometry, material);
+            scene.add(line);
+            joinLines.push(line);
+            
+            // Add glowing particles along the join line
+            const particlesGeometry = new THREE.BufferGeometry();
+            const particlesCount = 20;
+            const posArray = new Float32Array(particlesCount * 3);
+            
+            for (let i = 0; i < particlesCount * 3; i += 3) {
+                const t = i / (particlesCount * 3);
+                const point = curve.getPoint(t);
+                posArray[i] = point.x;
+                posArray[i + 1] = point.y;
+                posArray[i + 2] = point.z;
+            }
+            
+            particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+            
+            const particlesMaterial = new THREE.PointsMaterial({
+                color: join.color,
+                size: 0.1,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+            
+            const particles = new THREE.Points(particlesGeometry, particlesMaterial);
+            scene.add(particles);
+            
+            // Store join info for interaction
+            line.userData = {
+                type: 'join',
+                from: join.from,
+                to: join.to,
+                fromKey: join.fromKey,
+                toKey: join.toKey,
+                particles: particles
+            };
+            
+            return line;
+        }
+
+        // Create all joins
+        joins.forEach(join => createJoin(join));
+
+        // Animation for join lines
+        function animateJoins() {
+            joinLines.forEach(line => {
+                if (line.userData && line.userData.particles) {
+                    const positions = line.userData.particles.geometry.attributes.position.array;
+                    for (let i = 0; i < positions.length; i += 3) {
+                        positions[i + 1] += 0.01;
+                        if (positions[i + 1] > 5) positions[i + 1] = 0;
+                    }
+                    line.userData.particles.geometry.attributes.position.needsUpdate = true;
+                }
+            });
+        }
+
+        // Create a flowing data pipeline for queries
+        function createDataPipeline(fromTable, toTable, color, duration = 3000) {
+            const fromPos = fromTable.mesh.position;
+            const toPos = toTable.mesh.position;
+            
+            const curve = new THREE.CubicBezierCurve3(
+                new THREE.Vector3(fromPos.x, fromPos.y + 0.5, fromPos.z),
+                new THREE.Vector3(
+                    (fromPos.x + toPos.x) / 2,
+                    Math.max(fromPos.y, toPos.y) + 3,
+                    (fromPos.z + toPos.z) / 2
+                ),
+                new THREE.Vector3(
+                    (fromPos.x + toPos.x) / 2,
+                    Math.max(fromPos.y, toPos.y) + 3,
+                    (fromPos.z + toPos.z) / 2
+                ),
+                new THREE.Vector3(toPos.x, toPos.y + 0.5, toPos.z)
+            );
+            
+            const tubeGeometry = new THREE.TubeGeometry(curve, 20, 0.1, 8, false);
+            const tubeMaterial = new THREE.MeshBasicMaterial({
+                color: color,
+                transparent: true,
+                opacity: 0.7,
+                side: THREE.DoubleSide
+            });
+            const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+            scene.add(tube);
+            
+            // Animate data flowing through the pipeline
+            const startTime = Date.now();
+            
+            function animatePipeline() {
+                const elapsed = Date.now() - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                
+                // Create moving data points
+                const point = curve.getPoint(progress);
+                const sphere = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.15, 8, 8),
+                    new THREE.MeshBasicMaterial({ color: color })
+                );
+                sphere.position.copy(point);
+                scene.add(sphere);
+                
+                // Fade out the tube
+                tubeMaterial.opacity = 0.7 * (1 - progress);
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animatePipeline);
+                } else {
+                    scene.remove(tube);
+                }
+                
+                // Remove spheres after a delay
+                setTimeout(() => {
+                    scene.remove(sphere);
+                }, 500);
+            }
+            
+            animatePipeline();
+        }
+
+        // Handle table selection
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let selectedTable = null;
+
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(tableHighlights);
+            
+            if (intersects.length > 0) {
+                const tableName = intersects[0].object.userData.name;
+                selectTable(tableName);
+            } else {
+                if (selectedTable) {
+                    tables[selectedTable].highlight.material.opacity = 0;
+                    selectedTable = null;
+                }
+            }
+        }
+
+        function selectTable(tableName) {
+            if (selectedTable) {
+                tables[selectedTable].highlight.material.opacity = 0;
+            }
+            
+            selectedTable = tableName;
+            tables[tableName].highlight.material.opacity = 0.3;
+            
+            // Display table info
+            document.getElementById('info').textContent = `Selected: ${tableName} | Columns: ${database[tableName].columns.join(', ')}`;
+        }
+
+        // Handle join hover
+        function onMouseMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(joinLines);
+            
+            joinLines.forEach(line => {
+                if (line.material) {
+                    line.material.opacity = 0.7;
+                    line.material.linewidth = 2;
+                }
+            });
+            
+            if (intersects.length > 0) {
+                const join = intersects[0].object.userData;
+                if (join.material) {
+                    join.material.opacity = 1;
+                    join.material.linewidth = 3;
+                }
+                document.getElementById('info').textContent = 
+                    `Join: ${join.from}.${join.fromKey} → ${join.to}.${join.toKey}`;
+            } else if (!selectedTable) {
+                document.getElementById('info').textContent = '3D Database Visualization | Click tables to inspect | Hover over joins';
+            }
+        }
+
+        // UI event handlers
+        document.getElementById('runQuery').addEventListener('click', () => {
+            // Simulate a JOIN query between users and orders
+            createDataPipeline(tables['users'].mesh, tables['orders'].mesh, 0x00ff88, 2000);
+            setTimeout(() => {
+                createDataPipeline(tables['orders'].mesh, tables['products'].mesh, 0x00ff88, 2000);
+            }, 1000);
+            
+            // Visualize the execution path
+            const queryPath = [
+                { x: -5, y: 2, z: 0 },  // users
+                { x: 0, y: 5, z: 0 },     // intermediate
+                { x: 5, y: 2, z: 0 },    // orders
+                { x: 0, y: 5, z: -5 },    // intermediate
+                { x: 0, y: 2, z: -5 }     // products
+            ];
+            
+            animateQueryPath(queryPath, 0xff00ff);
+        });
+
+        document.getElementById('insertData').addEventListener('click', () => {
+            if (selectedTable) {
+                // Add a new row with random data
+                const table = database[selectedTable];
+                const newRow = table.columns.map((col, i) => {
+                    if (i === 0) return table.data.length + 1; // ID
+                    if (col === 'name') return 'NewUser';
+                    if (col === 'email') return 'new@example.com';
+                    if (col === 'status') return 'active';
+                    if (col === 'product') return 'Item' + (table.data.length + 1);
+                    if (col === 'amount' || col === 'price') return Math.floor(Math.random() * 1000);
+                    if (col === 'stock') return Math.floor(Math.random() * 100);
+                    return 'data';
+                });
+                
+                table.data.push(newRow);
+                
+                // Visualize the insert
+                const tableMesh = tables[selectedTable].mesh;
+                const insertEffect = new THREE.Mesh(
+                    new THREE.PlaneGeometry(3.8, 0.5),
+                    new THREE.MeshBasicMaterial({
+                        color: 0x00ff00,
+                        transparent: true,
+                        opacity: 0.5,
+                        side: THREE.DoubleSide
+                    })
+                );
+                insertEffect.position.set(tableMesh.position.x, tableMesh.position.y - 0.7, tableMesh.position.z);
+                insertEffect.rotation.copy(tableMesh.rotation);
+                scene.add(insertEffect);
+                
+                // Animate the insert
+                let opacity = 0.5;
+                function animateInsert() {
+                    opacity -= 0.02;
+                    insertEffect.material.opacity = opacity;
+                    
+                    if (opacity > 0) {
+                        requestAnimationFrame(animateInsert);
+                    } else {
+                        scene.remove(insertEffect);
+                    }
+                }
+                animateInsert();
+            }
+        });
+
+        document.getElementById('updateData').addEventListener('click', () => {
+            if (selectedTable) {
+                // Visualize the update
+                const tableMesh = tables[selectedTable].mesh;
+                
+                // Create a pulse effect
+                const pulseGeometry = new THREE.PlaneGeometry(4, 3);
+                const pulseMaterial = new THREE.MeshBasicMaterial({
+                    color: 0xffff00,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.DoubleSide
+                });
+                const pulse = new THREE.Mesh(pulseGeometry, pulseMaterial);
+                pulse.position.copy(tableMesh.position);
+                pulse.rotation.copy(tableMesh.rotation);
+                scene.add(pulse);
+                
+                // Animate the pulse
+                let scale = 1;
+                function animatePulse() {
+                    scale += 0.05;
+                    pulse.scale.set(scale, scale, 1);
+                    pulseMaterial.opacity -= 0.02;
+                    
+                    if (pulseMaterial.opacity > 0) {
+                        requestAnimationFrame(animatePulse);
+                    } else {
+                        scene.remove(pulse);
+                    }
+                }
+                animatePulse();
+            }
+        });
+
+        document.getElementById('deleteData').addEventListener('click', () => {
+            if (selectedTable && database[selectedTable].data.length > 0) {
+                // Remove the last row
+                database[selectedTable].data.pop();
+                
+                // Visualize the delete
+                const tableMesh = tables[selectedTable].mesh;
+                const deleteEffect = new THREE.Mesh(
+                    new THREE.PlaneGeometry(3.8, 0.5),
+                    new THREE.MeshBasicMaterial({
+                        color: 0xff0000,
+                        transparent: true,
+                        opacity: 0.5,
+                        side: THREE.DoubleSide
+                    })
+                );
+                deleteEffect.position.set(tableMesh.position.x, tableMesh.position.y - 0.7, tableMesh.position.z);
+                deleteEffect.rotation.copy(tableMesh.rotation);
+                scene.add(deleteEffect);
+                
+                // Animate the delete
+                let opacity = 0.5;
+                function animateDelete() {
+                    opacity -= 0.02;
+                    deleteEffect.material.opacity = opacity;
+                    deleteEffect.position.y -= 0.01;
+                    
+                    if (opacity > 0) {
+                        requestAnimationFrame(animateDelete);
+                    } else {
+                        scene.remove(deleteEffect);
+                    }
+                }
+                animateDelete();
+            }
+        });
+
+        // Animate a query execution path
+        function animateQueryPath(points, color) {
+            const pathGeometry = new THREE.BufferGeometry().setFromPoints(points.map(p => 
+                new THREE.Vector3(p.x, p.y, p.z)
+            ));
+            
+            const pathMaterial = new THREE.LineBasicMaterial({
+                color: color,
+                linewidth: 2,
+                transparent: true,
+                opacity: 0.7
+            });
+            
+            const pathLine = new THREE.Line(pathGeometry, pathMaterial);
+            scene.add(pathLine);
+            
+            // Add animated arrowheads
+            let progress = 0;
+            const arrowSize = 0.3;
+            
+            function animatePath() {
+                progress += 0.01;
+                if (progress > 1) progress = 0;
+                
+                // Remove previous arrows
+                scene.children.filter(c => c.userData.isPathArrow).forEach(a => scene.remove(a));
+                
+                // Add new arrow at current position
+                const arrowPos = getPointOnPath(points, progress);
+                const arrowDir = getPointOnPath(points, progress + 0.01);
+                
+                if (arrowPos && arrowDir) {
+                    const direction = new THREE.Vector3().subVectors(arrowDir, arrowPos).normalize();
+                    const arrow = new THREE.ArrowHelper(
+                        direction,
+                        arrowPos,
+                        arrowSize,
+                        color
+                    );
+                    arrow.userData.isPathArrow = true;
+                    scene.add(arrow);
+                }
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animatePath);
+                } else {
+                    setTimeout(() => {
+                        scene.remove(pathLine);
+                        scene.children.filter(c => c.userData.isPathArrow).forEach(a => scene.remove(a));
+                    }, 1000);
+                }
+            }
+            
+            animatePath();
+        }
+
+        function getPointOnPath(points, t) {
+            const segment = Math.floor(t * (points.length - 1));
+            const segmentT = (t * (points.length - 1)) % 1;
+            
+            if (segment >= points.length - 1) {
+                return new THREE.Vector3(
+                    points[points.length - 1].x,
+                    points[points.length - 1].y,
+                    points[points.length - 1].z
+                );
+            }
+            
+            return new THREE.Vector3(
+                points[segment].x + (points[segment + 1].x - points[segment].x) * segmentT,
+                points[segment].y + (points[segment + 1].y - points[segment].y) * segmentT,
+                points[segment].z + (points[segment + 1].z - points[segment].z) * segmentT
+            );
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Add event listeners
+        window.addEventListener('click', onMouseClick);
+        window.addEventListener('mousemove', onMouseMove);
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            animateJoins();
+            renderer.render(scene, camera);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
