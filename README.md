@@ -5,17 +5,27 @@ A collection of multiple programming and project-related resources, covering **A
 ## 📑 Repository Structure
 
 meta/
-├── .vscode/ # VSCode configuration files
-├── algo/ # Algorithm implementations
-├── dataStructures/ # Data Structures examples & explanations
-├── machineLeaning/ # Machine Learning code & experiments
-├── meta/ # Meta information / configs
-├── model/ # Trained models or architecture definitions
-├── coa.html # Computer Organization & Architecture notes
-├── db.json # Database configuration / mock data
-├── dbms.html # Database Management System notes
-├── os.html # Operating System notes
-└── three.js # JavaScript 3D library usage example
+├── .vscode/ 
+
+├── algo/ 
+
+├── dataStructures/ 
+
+├── machineLeaning/ 
+
+├── meta/ 
+
+├── model/ 
+
+├── coa.html
+
+├── db.json
+
+├── dbms.html
+
+├── os.html 
+
+└── three.js 
 
 ## 📊 Language Breakdown
 ![Language Stats](https://img.shields.io/badge/JavaScript-57.8%25-yellow)
