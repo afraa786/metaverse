@@ -3,7 +3,7 @@
 A collection of multiple programming and project-related resources, covering **Algorithms, Data Structures, Machine Learning, Models, and Web Development**.
 
 ## 📑 Repository Structure
-
+```
 meta/
 ├── .vscode/ 
 
@@ -26,7 +26,7 @@ meta/
 ├── os.html 
 
 └── three.js 
-
+```
 ## 📊 Language Breakdown
 ![Language Stats](https://img.shields.io/badge/JavaScript-57.8%25-yellow)
 ![Language Stats](https://img.shields.io/badge/HTML-23.1%25-orange)
