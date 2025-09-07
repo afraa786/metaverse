@@ -1,5 +1,5 @@
 # 📂 MetaVerse Repository
-## Augmented Reality in learning, covering **Algorithms, Data Structures, Machine Learning, Models, Web Development, Computer Networks and Operating Systems**.
+## Augmented Reality in learning, covering **Algorithms, Data Structures, Machine Learning, Models, Web Development, Computer Networks, Database Management System and Operating Systems**.
 <img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/0058b15b-dc22-4726-990b-ab9ec7454415" />
 
 
