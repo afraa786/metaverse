@@ -1,6 +1,8 @@
-# 📂 Meta Repository
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/d358d42d-79ba-4ab4-bb9e-4d2bfa058b66" /># 📂 MetaVerse Repository
 
 A collection of multiple programming and project-related resources, covering **Algorithms, Data Structures, Machine Learning, Models, and Web Development**.
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/0058b15b-dc22-4726-990b-ab9ec7454415" />
+
 
 ## 📑 Repository Structure
 ```
@@ -42,31 +44,34 @@ meta/
 - Contains various algorithm implementations with step-by-step explanations.
 
 ### 📁 **dataStructures/**
-- Data structure code snippets and notes for quick reference.
+- Data structure code visualization to study and understand.
 
 ### 📁 **machineLeaning/**
 - Machine learning scripts, models, and experiments.
 
 ### 📁 **meta/**
-- Repository meta files and configs.
+- Repository meta files if frontend.
 
 ### 📁 **model/**
-- Saved/trained ML models or configuration files.
+- 3D ML models to understand their working.
 
 ### 📄 **coa.html**
-- Notes and resources for **Computer Organization & Architecture**.
+- 3D models **Computer Organization & Architecture**.
 
 ### 📄 **dbms.html**
-- Comprehensive notes on **Database Management Systems**.
+- Visualize **Database Management Systems**.
 
 ### 📄 **os.html**
-- Notes on **Operating Systems** concepts.
+- Working of different **Operating Systems** Algorithms.
 
 ### 📄 **db.json**
 - JSON file for mock database or configuration.
 
 ### 📄 **three.js**
 - JavaScript 3D rendering example with **Three.js**.
+
+### 📄 **cn.html**
+- AUGMENTED REALITY of network topologies.
 
 ---
 
